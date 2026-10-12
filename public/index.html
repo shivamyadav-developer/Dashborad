@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="UTF-8" />
+
+  <title>HomeTown BigQuery Upload</title>
+
+  <style>
+
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 650px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    select,
+    input,
+    button {
+      width: 100%;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+
+    button {
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    #message {
+      margin-top: 20px;
+      padding: 15px;
+      white-space: pre-line;
+    }
+
+    .info {
+      background: #f3f3f3;
+      padding: 15px;
+      margin-bottom: 25px;
+      border-radius: 5px;
+    }
+
+    .date-row {
+      display: flex;
+      gap: 15px;
+    }
+
+    .date-row .form-group {
+      flex: 1;
+    }
+
+    .hint {
+      font-weight: normal;
+      font-size: 13px;
+      color: #666;
+      margin-top: 6px;
+    }
+
+    #articleDateFields {
+      border: 1px solid #ddd;
+      border-radius: 5px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+
+  </style>
+
+</head>
+
+
+<body>
+
+  <h1>
+    HomeTown BigQuery CSV Upload
+  </h1>
+
+
+  <div class="info">
+
+    <strong>Article Wise:</strong>
+
+    The complete CSV can contain multiple dates.
+    The CSV contains data up to the previous day.
+    By default, the system automatically fills in every day
+    that is missing since your last upload (up to yesterday) —
+    so if you skipped a weekend, it catches up on all of those
+    days in one go. You can also set a specific From/To range
+    below to upload manually.
+
+    <br><br>
+
+    <strong>ABP:</strong>
+
+    The complete ABP CSV will replace the existing ABP table.
+
+    <br><br>
+
+    <strong>GM Target:</strong>
+
+    No upload required. Company-defined GM Target remains unchanged.
+
+  </div>
+
+
+  <form id="uploadForm">
+
+
+    <div class="form-group">
+
+      <label>
+        Select Table
+      </label>
+
+      <select
+        id="table"
+        name="table"
+      >
+
+        <option value="article">
+          Article Wise Report
+        </option>
+
+        <option value="abp">
+          ABP Report
+        </option>
+
+      </select>
+
+    </div>
+
+
+    <div id="articleDateFields">
+
+      <label style="margin-bottom: 12px;">
+        Date Range (Article Wise only)
+        <div class="hint">
+          Leave both blank to auto catch-up from your last
+          uploaded date through yesterday. Fill these in only if
+          you want to upload a specific date or range instead.
+        </div>
+      </label>
+
+      <div class="date-row">
+
+        <div class="form-group">
+          <label for="startDate">From (optional)</label>
+          <input type="date" id="startDate" name="startDate" />
+        </div>
+
+        <div class="form-group">
+          <label for="endDate">To (optional)</label>
+          <input type="date" id="endDate" name="endDate" />
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <div class="form-group">
+
+      <label>
+        Select CSV File
+      </label>
+
+      <input
+        type="file"
+        id="file"
+        name="file"
+        accept=".csv"
+        required
+      />
+
+    </div>
+
+
+    <button type="submit">
+
+      Upload CSV
+
+    </button>
+
+
+  </form>
+
+
+  <div id="message"></div>
+
+
+  <script>
+
+    const form =
+      document.getElementById(
+        "uploadForm"
+      );
+
+
+    const message =
+      document.getElementById(
+        "message"
+      );
+
+
+    const tableSelect =
+      document.getElementById(
+        "table"
+      );
+
+
+    const articleDateFields =
+      document.getElementById(
+        "articleDateFields"
+      );
+
+
+    /*
+      Date range only makes sense for Article Wise.
+      Hide it for ABP.
+    */
+
+    function updateDateFieldsVisibility() {
+
+      articleDateFields.style.display =
+        tableSelect.value === "article"
+          ? "block"
+          : "none";
+
+    }
+
+
+    tableSelect.addEventListener(
+      "change",
+      updateDateFieldsVisibility
+    );
+
+
+    updateDateFieldsVisibility();
+
+
+    form.addEventListener(
+      "submit",
+      async function (event) {
+
+        event.preventDefault();
+
+
+        const file =
+          document.getElementById(
+            "file"
+          ).files[0];
+
+
+        const table =
+          tableSelect.value;
+
+
+        const startDate =
+          document.getElementById(
+            "startDate"
+          ).value;
+
+
+        const endDate =
+          document.getElementById(
+            "endDate"
+          ).value;
+
+
+        if (!file) {
+
+          message.innerText =
+            "Please select a CSV file.";
+
+          return;
+        }
+
+
+        const formData =
+          new FormData();
+
+
+        formData.append(
+          "file",
+          file
+        );
+
+
+        formData.append(
+          "table",
+          table
+        );
+
+
+        /*
+          Only send date range for Article Wise,
+          and only when the user actually filled them in.
+        */
+
+        if (
+          table === "article"
+        ) {
+
+          if (startDate) {
+
+            formData.append(
+              "startDate",
+              startDate
+            );
+
+          }
+
+          if (endDate) {
+
+            formData.append(
+              "endDate",
+              endDate
+            );
+
+          }
+
+        }
+
+
+        message.innerText =
+          "Uploading... Please wait.";
+
+
+        try {
+
+          const response =
+            await fetch(
+              "/api/upload/csv",
+              {
+                method: "POST",
+                body: formData,
+              }
+            );
+
+
+          const data =
+            await response.json();
+
+
+          if (!response.ok) {
+
+            throw new Error(
+              data.message ||
+              "Upload failed"
+            );
+          }
+
+
+          let resultMessage =
+            "✅ " + data.message;
+
+
+          /*
+             ARTICLE WISE RESULT
+          */
+
+          if (
+            data.startDate &&
+            data.endDate
+          ) {
+
+            resultMessage +=
+              data.startDate === data.endDate
+                ? `\n\nDate: ${data.startDate}`
+                : `\n\nDate Range: ${data.startDate} to ${data.endDate}`;
+
+          } else if (
+            data.targetDate
+          ) {
+
+            resultMessage +=
+              `\n\nTarget Date: ${data.targetDate}`;
+
+          }
+
+
+          if (
+            data.latestDateInBigQuery
+          ) {
+
+            resultMessage +=
+              `\nPrevious latest date in BigQuery: ${data.latestDateInBigQuery}`;
+
+          }
+
+
+          if (
+            data.rowsForTargetDate !== undefined
+          ) {
+
+            resultMessage +=
+              `\nRows uploaded: ${data.rowsForTargetDate}`;
+
+          }
+
+
+          if (
+            data.totalCsvRows !== undefined
+          ) {
+
+            resultMessage +=
+              `\nTotal CSV rows: ${data.totalCsvRows}`;
+
+          }
+
+
+          if (
+            data.missingDates &&
+            data.missingDates.length > 0
+          ) {
+
+            resultMessage +=
+              `\n⚠ No rows found in CSV for: ${data.missingDates.join(", ")}`;
+
+          }
+
+
+          /*
+             ABP RESULT
+          */
+
+          if (
+            data.result
+          ) {
+
+            if (
+              data.result.table
+            ) {
+
+              resultMessage +=
+                `\n\nTable: ${data.result.table}`;
+
+            }
+
+            if (
+              data.result.jobId
+            ) {
+
+              resultMessage +=
+                `\nJob ID: ${data.result.jobId}`;
+
+            }
+
+          }
+
+
+          message.innerText =
+            resultMessage;
+
+
+          form.reset();
+
+          updateDateFieldsVisibility();
+
+
+        } catch (error) {
+
+          message.innerText =
+            "❌ " +
+            error.message;
+
+        }
+
+      }
+    );
+
+  </script>
+
+
+</body>
+
+</html>
